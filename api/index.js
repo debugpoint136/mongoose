@@ -2,14 +2,52 @@ var express = require('express')
 var mongoose = require('mongoose')
 var bodyParser = require('body-parser')
 var logger = require('morgan')
+var errorHandler = require('errorHandler');
 
 var app = express()
 var dbUri = 'mongodb://localhost:27017/api'
 var dbConnection = mongoose.createConnection(dbUri)
 var Schema = mongoose.Schema
 var postSchema = new Schema ({
-	title: String,
-	text: String
+	title: { 
+		type : String,
+		required : true,
+		trim : true,
+		match: /^([\w ,.!?]{1,100}$)/ 
+	},
+	text: { 
+		type: String,
+		required : true,
+		max: 2000
+	},
+	followers: [Schema.Types.ObjectId],
+	meta: Schema.Types.Mixed,
+	comments: [{
+		text: {
+			type: String,
+			trim: true,
+			max: 2000,
+		},
+		author: {
+			id: {
+				type: Schema.Types.ObjectId,
+				ref: 'User'
+			},
+			name: String
+		}
+	}],
+	viewCounter: Number,
+	published: Boolean,
+	createdAt: {
+		type: Date,
+		default: Date.now,
+		required: true
+	},
+	updatedAt: {
+		type: Date,
+		default: Date.now,
+		required: true
+	}
 })
 var Post = dbConnection.model('Post', postSchema, 'posts')
 app.use(logger('dev'))
@@ -28,9 +66,15 @@ app.get('/posts', function(req, res) {
 })
 app.post('/posts', function(req, res, next){
 	var post = new Post (req.body)
-	post.save(function(error, results){
+	post.validate(function(error){
+		console.log(error)
 		if (error) return next(error)
-		res.send(results)
+			post.save(function(error, results){
+			if (error) return next(error)
+			res.send(results)
+		})
 	})
+	
 })
+app.use(errorHandler())
 var server = require('http').createServer(app).listen(3000);
